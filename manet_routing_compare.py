@@ -1,4 +1,5 @@
 import csv
+import sys
 
 import ns.aodv
 import ns.applications
@@ -82,11 +83,15 @@ class RoutingExperiment:
         return self.m_CSVfileName
 
     # int nSinks, double txp, std::string CSVfileName
-    def Run(self, nSinks, txp, CSVfileName):
+    def Run(self, *positional_parameters, **keyword_parameters):
         ns.network.Packet.EnablePrinting()
-        self.m_nSinks = nSinks;
-        self.m_txp = txp
-        self.m_CSVfileName = CSVfileName
+
+        if 'nSinks' in keyword_parameters:
+            self.m_nSinks = keyword_parameters['nSinks'];
+        if 'txp' in keyword_parameters:
+            self.m_txp = keyword_parameters['txp'];
+        if 'CSVfileName' in keyword_parameters:
+            self.m_CSVfileName = keyword_parameters['CSVfileName'];
 
         nWifis = 50
 
@@ -123,8 +128,8 @@ class RoutingExperiment:
                                      "DataMode", ns.core.StringValue(phyMode),
                                      "ControlMode", ns.core.StringValue(phyMode))
 
-        wifiPhy.Set("TxPowerStart", ns.core.DoubleValue(txp))
-        wifiPhy.Set("TxPowerEnd", ns.core.DoubleValue(txp))
+        wifiPhy.Set("TxPowerStart", ns.core.DoubleValue(self.m_txp))
+        wifiPhy.Set("TxPowerEnd", ns.core.DoubleValue(self.m_txp))
 
         wifiMac.SetType("ns3::AdhocWifiMac")
         adhocDevices = wifi.Install(wifiPhy, wifiMac, adhocNodes) # type: NetDeviceContainer
@@ -193,7 +198,7 @@ class RoutingExperiment:
         onoff1.SetAttribute("OnTime", ns.core.StringValue("ns3::ConstantRandomVariable[Constant=1.0]"))
         onoff1.SetAttribute("OffTime", ns.core.StringValue("ns3::ConstantRandomVariable[Constant=0.0]"))
 
-        for i in range(0, nSinks):
+        for i in range(0, self.m_nSinks):
             # Ptr<Socket> sink = SetupPacketReceive (adhocInterfaces.GetAddress (i), adhocNodes.Get (i));
             sink = SetupPacketReceive(adhocInterfaces.GetAddress(i), adhocNodes.Get(i))
 
@@ -205,7 +210,7 @@ class RoutingExperiment:
             posURV.SetTypeId("ns3::UniformRandomVariable")
             var = posURV.Create().GetObject(ns.core.UniformRandomVariable.GetTypeId())
 
-            temp = onoff1.Install(adhocNodes.Get(i + nSinks)) # type: ApplicationContainer
+            temp = onoff1.Install(adhocNodes.Get(i + self.m_nSinks)) # type: ApplicationContainer
             temp.Start(Seconds(var.GetValue(100.0, 101.0)))
             temp.Stop(Seconds(TotalTime))
 
@@ -245,3 +250,14 @@ class RoutingExperiment:
         # flowmon->SerializeToXmlFile ((tr_name + ".flowmon").c_str(), false, false);
 
         ns.core.Simulator.Destroy()
+
+if __name__ == "__main__":
+    v = RoutingExperiment()
+    if len(sys.argv) == 1:
+        v.Run()
+    if len(sys.argv) == 2:
+        v.Run(nSinks=(sys.argv[1]))
+    if len(sys.argv) == 3:
+        v.Run(nSinks=int(sys.argv[1]), txp=float(sys.argv[2]))
+    if len(sys.argv) == 4:
+        v.Run(nSinks=int(sys.argv[1]), txp=float(sys.argv[2]), CSVfileName=sys.argv[3])
