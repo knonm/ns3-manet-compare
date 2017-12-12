@@ -8,7 +8,7 @@ Waf contains some options that automatically update the python path to find the 
 
 ```sh 
 $ ./waf shell
-# python work/manet_routing_compare.py [args]
+$# python work/manet_routing_compare.py [args]
 ```
 
 and the other is to use the --pyrun option to waf:
@@ -21,7 +21,7 @@ To run a python script under the C debugger:
 
 ```sh
 $ ./waf shell
-# gdb --args python work/manet_routing_compare.py [args]
+$# gdb --args python work/manet_routing_compare.py [args]
 ```
 
 The args are optional and have an order, as follows:
