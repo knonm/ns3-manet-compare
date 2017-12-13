@@ -30,7 +30,9 @@ RUN apt-get -y install wget
 RUN cd /tmp && \
     wget https://bootstrap.pypa.io/get-pip.py && \
     python get-pip.py
-RUN apt-get -y install gccxml python-pygccxml
+RUN apt-get install -y gccxml python-pygccxml
+
+RUN apt-get install -y python-gnome2 python-rsvg
 
 WORKDIR /usr/ns3/ns-3.26
 

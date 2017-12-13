@@ -1,5 +1,6 @@
 import csv
 import sys
+import os
 
 import ns.aodv
 import ns.applications
@@ -12,8 +13,11 @@ import ns.network
 import ns.olsr
 import ns.wifi
 
-class RoutingExperiment:
+__location__ = os.path.realpath(
+    os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
+
+class RoutingExperiment:
     def __init__(self):
         self.port = 9
         self.bytesTotal = 0
@@ -31,7 +35,7 @@ class RoutingExperiment:
         oss = str(ns.core.Simulator.Now().GetSeconds()) + " " + str(socket.GetNode().GetId())
 
         if ns.network.InetSocketAddress.IsMatchingType(senderAddress):
-            addr = ns.network.InetSocketAddress.ConvertFrom(senderAddress) # type: InetSocketAddress
+            addr = ns.network.InetSocketAddress.ConvertFrom(senderAddress)  # type: InetSocketAddress
             oss += " received one packet from " + str(addr.GetIpv4().Get())
         else:
             oss += " received one packet!"
@@ -41,7 +45,7 @@ class RoutingExperiment:
     # Ptr<Socket> socket
     # returns void
     def ReceivePacket(self, socket):
-        senderAddress = ns.network.Address() # type: ns.network.Address
+        senderAddress = ns.network.Address()  # type: ns.network.Address
         packet = socket.RecvFrom(senderAddress)
         while packet != None:
             self.bytesTotal += packet.GetSize()
@@ -53,7 +57,7 @@ class RoutingExperiment:
         kbs = (self.bytesTotal * 8.0) / 1000
         self.bytesTotal = 0
 
-        with open(self.m_CSVfileName, "w") as csvfile:
+        with open(os.path.join(__location__, self.m_CSVfileName), 'a') as csvfile:
             spamwriter = csv.writer(csvfile, delimiter=';',
                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
             spamwriter.writerow([kbs, self.packetsReceived, self.m_nSinks, self.m_protocolName, self.m_txp])
@@ -64,9 +68,9 @@ class RoutingExperiment:
     # Ipv4Address addr, Ptr<Node> node
     # returns Ptr<Socket>
     def SetupPacketReceive(self, addr, node):
-        tid = ns.core.TypeId.LookupByName("ns3::UdpSocketFactory") # type: TypeId
-        sink = ns.network.Socket.CreateSocket(node, tid) # type: Ptr<Socket>
-        local = ns.network.InetSocketAddress(addr, self.port) # type: InetSocketAddress
+        tid = ns.core.TypeId.LookupByName("ns3::UdpSocketFactory")  # type: TypeId
+        sink = ns.network.Socket.CreateSocket(node, tid)  # type: Ptr<Socket>
+        local = ns.network.InetSocketAddress(addr, self.port)  # type: InetSocketAddress
         sink.Bind(local)
         sink.SetRecvCallback(self.ReceivePacket)
 
@@ -74,8 +78,8 @@ class RoutingExperiment:
 
     # int argc, char **argv
     # returns string
-    def CommandSetup(argc, argv):
-        cmd = ns.core.CommandLine() # type: CommandLine
+    def CommandSetup(self, argc, argv):
+        cmd = ns.core.CommandLine()  # type: CommandLine
         cmd.AddValue("CSVfileName", "The name of the CSV output file name", self.m_CSVfileName)
         cmd.AddValue("traceMobility", "Enable mobility tracing", self.m_traceMobility)
         cmd.AddValue("protocol", "1=OLSR;2=AODV;3=DSDV;4=DSR", self.m_protocol)
@@ -99,8 +103,8 @@ class RoutingExperiment:
         rate = "2048bps"
         phyMode = "DsssRate11Mbps"
         tr_name = "manet-routing-compare"
-        nodeSpeed = 20 # in m/s
-        nodePause = 0 # in s
+        nodeSpeed = 20  # in m/s
+        nodePause = 0  # in s
         self.m_protocolName = "protocol"
 
         ns.core.Config.SetDefault("ns3::OnOffApplication::PacketSize", ns.core.StringValue("64"))
@@ -132,10 +136,10 @@ class RoutingExperiment:
         wifiPhy.Set("TxPowerEnd", ns.core.DoubleValue(self.m_txp))
 
         wifiMac.SetType("ns3::AdhocWifiMac")
-        adhocDevices = wifi.Install(wifiPhy, wifiMac, adhocNodes) # type: NetDeviceContainer
+        adhocDevices = wifi.Install(wifiPhy, wifiMac, adhocNodes)  # type: NetDeviceContainer
 
         mobilityAdhoc = ns.mobility.MobilityHelper()
-        streamIndex = 0 # used to get consistent mobility across scenarios
+        streamIndex = 0  # used to get consistent mobility across scenarios
 
         pos = ns.core.ObjectFactory()
         pos.SetTypeId("ns3::RandomRectanglePositionAllocator")
@@ -143,7 +147,8 @@ class RoutingExperiment:
         pos.Set("Y", ns.core.StringValue("ns3::UniformRandomVariable[Min=0.0|Max=1500.0]"))
 
         # Same as: Ptr<PositionAllocator> taPositionAlloc = pos.Create ()->GetObject<PositionAllocator> ();
-        taPositionAlloc = pos.Create().GetObject(ns.mobility.PositionAllocator.GetTypeId()) # type: Ptr<PositionAllocator>
+        taPositionAlloc = pos.Create().GetObject(
+            ns.mobility.PositionAllocator.GetTypeId())  # type: Ptr<PositionAllocator>
         streamIndex += taPositionAlloc.AssignStreams(streamIndex)
 
         ssSpeed = "ns3::UniformRandomVariable[Min=0.0|Max=%s]" % (nodeSpeed)
@@ -173,12 +178,12 @@ class RoutingExperiment:
             list.Add(aodv, 100)
             self.m_protocolName = "AODV"
         elif self.m_protocol == 3:
-            list.Add (dsdv, 100)
+            list.Add(dsdv, 100)
             self.m_protocolName = "DSDV"
         elif self.m_protocol == 4:
             self.m_protocolName = "DSR"
         else:
-            print("No such protocol:%s" % (self.m_protocol)) # NS_FATAL_ERROR ("No such protocol:" << m_protocol);
+            print("No such protocol:%s" % (self.m_protocol))  # NS_FATAL_ERROR ("No such protocol:" << m_protocol);
 
         if self.m_protocol < 4:
             internet.SetRoutingHelper(list)
@@ -187,7 +192,7 @@ class RoutingExperiment:
             internet.Install(adhocNodes)
             dsrMain.Install(dsr, adhocNodes)
 
-        print("assigning ip address") # NS_LOG_INFO("assigning ip address");
+        print("assigning ip address")  # NS_LOG_INFO("assigning ip address");
 
         addressAdhoc = ns.internet.Ipv4AddressHelper()
         addressAdhoc.SetBase(ns.network.Ipv4Address("10.1.1.0"), ns.network.Ipv4Mask("255.255.255.0"))
@@ -202,7 +207,8 @@ class RoutingExperiment:
             # Ptr<Socket> sink = SetupPacketReceive (adhocInterfaces.GetAddress (i), adhocNodes.Get (i));
             sink = self.SetupPacketReceive(adhocInterfaces.GetAddress(i), adhocNodes.Get(i))
 
-            remoteAddress = ns.network.AddressValue(ns.network.InetSocketAddress(adhocInterfaces.GetAddress(i), self.port))
+            remoteAddress = ns.network.AddressValue(
+                ns.network.InetSocketAddress(adhocInterfaces.GetAddress(i), self.port))
             onoff1.SetAttribute("Remote", remoteAddress);
 
             # Ptr<UniformRandomVariable> var = CreateObject<UniformRandomVariable> ();
@@ -210,7 +216,7 @@ class RoutingExperiment:
             posURV.SetTypeId("ns3::UniformRandomVariable")
             var = posURV.Create().GetObject(ns.core.UniformRandomVariable.GetTypeId())
 
-            temp = onoff1.Install(adhocNodes.Get(i + self.m_nSinks)) # type: ApplicationContainer
+            temp = onoff1.Install(adhocNodes.Get(i + self.m_nSinks))  # type: ApplicationContainer
             temp.Start(ns.core.Seconds(var.GetValue(100.0, 101.0)))
             temp.Stop(ns.core.Seconds(TotalTime))
 
@@ -250,6 +256,7 @@ class RoutingExperiment:
         # flowmon->SerializeToXmlFile ((tr_name + ".flowmon").c_str(), false, false);
 
         ns.core.Simulator.Destroy()
+
 
 if __name__ == "__main__":
     v = RoutingExperiment()

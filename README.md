@@ -37,7 +37,10 @@ All dependencies installed for this container are listed on:  https://www.nsnam.
 
 ```sh
 $ docker build -t knonm/ns3-manet-compare .
-$ docker run --rm -it -v `pwd`:/usr/ns3/ns-3.26/work knonm/ns3-manet-compare
+$ docker run --rm \
+    -v `pwd`:/usr/ns3/ns-3.26/work \
+    knonm/ns3-manet-compare \
+    ./waf --pyrun work/manet_routing_compare.py
 ```
 
 ### GUI support on OSX:
