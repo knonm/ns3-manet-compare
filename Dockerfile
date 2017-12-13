@@ -7,7 +7,6 @@ RUN apt-get update && \
     python-pygraphviz \
     python-kiwi \
     python-pygoocanvas \
-    python-pygccxml \
     libgoocanvas-dev \
     ipython \
     openmpi-bin \
@@ -26,6 +25,12 @@ RUN apt-get update && \
     dvipng \
     python-sphinx \
     dia
+
+RUN apt-get -y install wget
+RUN cd /tmp && \
+    wget https://bootstrap.pypa.io/get-pip.py && \
+    python get-pip.py
+RUN apt-get -y install gccxml python-pygccxml
 
 WORKDIR /usr/ns3/ns-3.26
 
