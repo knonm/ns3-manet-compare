@@ -16,7 +16,6 @@ import ns.wifi
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-
 class RoutingExperiment:
     def __init__(self):
         self.port = 9
@@ -25,7 +24,7 @@ class RoutingExperiment:
         self.m_CSVfileName = "manet-routing.output.csv"
         self.m_nSinks = 10
         self.m_protocolName = ""
-        self.m_txp = 0.0
+        self.m_txp = 7.5
         self.m_traceMobility = False
         self.m_protocol = 2
 
@@ -36,11 +35,13 @@ class RoutingExperiment:
 
         if ns.network.InetSocketAddress.IsMatchingType(senderAddress):
             addr = ns.network.InetSocketAddress.ConvertFrom(senderAddress)  # type: InetSocketAddress
-            oss += " received one packet from " + str(addr.GetIpv4().Get())
+            ipv4 = addr.GetIpv4() # type: Ipv4Address
+            oss += " received one packet from "
+            sys.stdout.write(oss)
+            print ipv4
         else:
             oss += " received one packet!"
-
-        return oss
+            print oss
 
     # Ptr<Socket> socket
     # returns void
@@ -50,17 +51,24 @@ class RoutingExperiment:
         while packet != None:
             self.bytesTotal += packet.GetSize()
             self.packetsReceived += 1
-            print(self.PrintReceivedPacket(socket, packet, senderAddress))
+            self.PrintReceivedPacket(socket, packet, senderAddress)
             packet = socket.RecvFrom(senderAddress)
+
+    def WriteHeaderCsv(self):
+        with open(os.path.join(__location__, self.m_CSVfileName), 'w') as csvfile:
+            spamwriter = csv.writer(csvfile, delimiter=';',
+                                    quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            spamwriter.writerow(['SimulationSecond', 'ReceiveRate', 'PacketsReceived', 'NumberOfSinks', 'RoutingProtocol', 'TransmissionPower'])
 
     def CheckThroughput(self):
         kbs = (self.bytesTotal * 8.0) / 1000
         self.bytesTotal = 0
+        now = int((ns.core.Simulator.Now()).GetSeconds())
 
         with open(os.path.join(__location__, self.m_CSVfileName), 'a') as csvfile:
             spamwriter = csv.writer(csvfile, delimiter=';',
                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            spamwriter.writerow([kbs, self.packetsReceived, self.m_nSinks, self.m_protocolName, self.m_txp])
+            spamwriter.writerow([now, kbs, self.packetsReceived, self.m_nSinks, self.m_protocolName, self.m_txp])
 
         self.packetsReceived = 0
         ns.core.Simulator.Schedule(ns.core.Seconds(1.0), RoutingExperiment.CheckThroughput, self)
@@ -248,6 +256,7 @@ class RoutingExperiment:
         # NS_LOG_INFO ("Run Simulation.");
         print("Run Simulation.")
 
+        self.WriteHeaderCsv()
         self.CheckThroughput()
 
         ns.core.Simulator.Stop(ns.core.Seconds(TotalTime))
