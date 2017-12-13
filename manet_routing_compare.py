@@ -27,12 +27,12 @@ class RoutingExperiment:
 
     # Ptr<Socket> socket, Ptr<Packet> packet, Address senderAddress
     # returns string
-    def PrintReceivedPacket(socket, packet, senderAddress):
-        oss = ns.core.Simulator.Now().GetSeconds() + " " + socket.GetNode().GetId()
+    def PrintReceivedPacket(self, socket, packet, senderAddress):
+        oss = str(ns.core.Simulator.Now().GetSeconds()) + " " + str(socket.GetNode().GetId())
 
         if ns.network.InetSocketAddress.IsMatchingType(senderAddress):
             addr = ns.network.InetSocketAddress.ConvertFrom(senderAddress) # type: InetSocketAddress
-            oss += " received one packet from " + addr.GetIpv4()
+            oss += " received one packet from " + str(addr.GetIpv4().Get())
         else:
             oss += " received one packet!"
 
@@ -42,18 +42,18 @@ class RoutingExperiment:
     # returns void
     def ReceivePacket(self, socket):
         senderAddress = ns.network.Address() # type: ns.network.Address
-        packet = True
+        packet = socket.RecvFrom(senderAddress)
         while packet != None:
-            packet = socket.RecvFrom(senderAddress)
             self.bytesTotal += packet.GetSize()
             self.packetsReceived += 1
-            print(RoutingExperiment.PrintReceivedPacket(socket, packet, senderAddress))
+            print(self.PrintReceivedPacket(socket, packet, senderAddress))
+            packet = socket.RecvFrom(senderAddress)
 
     def CheckThroughput(self):
         kbs = (self.bytesTotal * 8.0) / 1000
         self.bytesTotal = 0
 
-        with open(self.m_CSVfileNam, "w", newline='') as csvfile:
+        with open(self.m_CSVfileName, "w") as csvfile:
             spamwriter = csv.writer(csvfile, delimiter=';',
                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
             spamwriter.writerow([kbs, self.packetsReceived, self.m_nSinks, self.m_protocolName, self.m_txp])
@@ -68,7 +68,7 @@ class RoutingExperiment:
         sink = ns.network.Socket.CreateSocket(node, tid) # type: Ptr<Socket>
         local = ns.network.InetSocketAddress(addr, self.port) # type: InetSocketAddress
         sink.Bind(local)
-        sink.SetRecvCallback(ns.core.MakeCallback(RoutingExperiment.ReceivePacket, self))
+        sink.SetRecvCallback(self.ReceivePacket)
 
         return sink
 
@@ -202,7 +202,7 @@ class RoutingExperiment:
             # Ptr<Socket> sink = SetupPacketReceive (adhocInterfaces.GetAddress (i), adhocNodes.Get (i));
             sink = self.SetupPacketReceive(adhocInterfaces.GetAddress(i), adhocNodes.Get(i))
 
-            remoteAddress = ns.core.AddressValue(ns.network.InetSocketAddress(adhocInterfaces.GetAddress(i), self.port))
+            remoteAddress = ns.network.AddressValue(ns.network.InetSocketAddress(adhocInterfaces.GetAddress(i), self.port))
             onoff1.SetAttribute("Remote", remoteAddress);
 
             # Ptr<UniformRandomVariable> var = CreateObject<UniformRandomVariable> ();
@@ -211,14 +211,14 @@ class RoutingExperiment:
             var = posURV.Create().GetObject(ns.core.UniformRandomVariable.GetTypeId())
 
             temp = onoff1.Install(adhocNodes.Get(i + self.m_nSinks)) # type: ApplicationContainer
-            temp.Start(Seconds(var.GetValue(100.0, 101.0)))
-            temp.Stop(Seconds(TotalTime))
+            temp.Start(ns.core.Seconds(var.GetValue(100.0, 101.0)))
+            temp.Stop(ns.core.Seconds(TotalTime))
 
         ss = nWifis
         nodes = ss
 
         ss2 = nodeSpeed
-        sNodeSpeed = ss2.str
+        sNodeSpeed = ss2
 
         ss3 = nodePause
         sNodePause = ss3
@@ -244,8 +244,8 @@ class RoutingExperiment:
 
         self.CheckThroughput()
 
-        ns.core.Simulator.Stop(Seconds(TotalTime))
-        ns.core.Simulator.Simulator.Run()
+        ns.core.Simulator.Stop(ns.core.Seconds(TotalTime))
+        ns.core.Simulator.Run()
 
         # flowmon->SerializeToXmlFile ((tr_name + ".flowmon").c_str(), false, false);
 
