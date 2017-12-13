@@ -47,7 +47,7 @@ class RoutingExperiment:
             packet = socket.RecvFrom(senderAddress)
             self.bytesTotal += packet.GetSize()
             self.packetsReceived += 1
-            print(PrintReceivedPacket(socket, packet, senderAddress))
+            print(RoutingExperiment.PrintReceivedPacket(socket, packet, senderAddress))
 
     def CheckThroughput(self):
         kbs = (self.bytesTotal * 8.0) / 1000
@@ -116,7 +116,7 @@ class RoutingExperiment:
         wifi = ns.wifi.WifiHelper()
         wifi.SetStandard(ns.wifi.WIFI_PHY_STANDARD_80211b)
 
-        wifiPhy = ns.wifi.YansWifiPhyHelper()
+        wifiPhy = ns.wifi.YansWifiPhyHelper.Default()
         wifiChannel = ns.wifi.YansWifiChannelHelper()
         wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel")
         wifiChannel.AddPropagationLoss("ns3::FriisPropagationLossModel")
@@ -190,7 +190,7 @@ class RoutingExperiment:
         print("assigning ip address") # NS_LOG_INFO("assigning ip address");
 
         addressAdhoc = ns.internet.Ipv4AddressHelper()
-        addressAdhoc.SetBase("10.1.1.0", "255.255.255.0")
+        addressAdhoc.SetBase(ns.network.Ipv4Address("10.1.1.0"), ns.network.Ipv4Mask("255.255.255.0"))
         adhocInterfaces = ns.internet.Ipv4InterfaceContainer()
         adhocInterfaces = addressAdhoc.Assign(adhocDevices)
 
@@ -200,7 +200,7 @@ class RoutingExperiment:
 
         for i in range(0, self.m_nSinks):
             # Ptr<Socket> sink = SetupPacketReceive (adhocInterfaces.GetAddress (i), adhocNodes.Get (i));
-            sink = SetupPacketReceive(adhocInterfaces.GetAddress(i), adhocNodes.Get(i))
+            sink = self.SetupPacketReceive(adhocInterfaces.GetAddress(i), adhocNodes.Get(i))
 
             remoteAddress = ns.core.AddressValue(ns.network.InetSocketAddress(adhocInterfaces.GetAddress(i), self.port))
             onoff1.SetAttribute("Remote", remoteAddress);
@@ -220,7 +220,7 @@ class RoutingExperiment:
         ss2 = nodeSpeed
         sNodeSpeed = ss2.str
 
-        ss3 = nodePause;
+        ss3 = nodePause
         sNodePause = ss3
 
         ss4 = rate
@@ -242,7 +242,7 @@ class RoutingExperiment:
         # NS_LOG_INFO ("Run Simulation.");
         print("Run Simulation.")
 
-        CheckThroughput()
+        self.CheckThroughput()
 
         ns.core.Simulator.Stop(Seconds(TotalTime))
         ns.core.Simulator.Simulator.Run()

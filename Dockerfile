@@ -7,6 +7,7 @@ RUN apt-get update && \
     python-pygraphviz \
     python-kiwi \
     python-pygoocanvas \
+    python-pygccxml \
     libgoocanvas-dev \
     ipython \
     openmpi-bin \
