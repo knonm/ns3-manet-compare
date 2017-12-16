@@ -1,6 +1,7 @@
 import csv
 import sys
 import os
+import time
 
 import ns.aodv
 import ns.applications
@@ -104,6 +105,17 @@ class RoutingExperiment:
     def Run(self, *positional_parameters, **keyword_parameters):
         ns.network.Packet.EnablePrinting()
 
+        if "SINKS" in os.environ:
+            self.m_nSinks = int(os.environ["SINKS"])
+        if "TXP" in os.environ:
+            self.m_txp = float(os.environ["TXP"])
+        if "TOTAL_TIME" in os.environ:
+            self.m_total_time = int(os.environ["TOTAL_TIME"])
+        if "NODES" in os.environ:
+            self.m_nodes = int(os.environ["NODES"])
+        if "FILE_NAME" in os.environ:
+            self.m_CSVfileName = os.environ["FILE_NAME"]
+
         if 'nSinks' in keyword_parameters:
             self.m_nSinks = keyword_parameters['nSinks'];
         if 'txp' in keyword_parameters:
@@ -115,6 +127,7 @@ class RoutingExperiment:
         if 'CSVfileName' in keyword_parameters:
             self.m_CSVfileName = keyword_parameters['CSVfileName'];
 
+        self.m_CSVfileName += "." + str(time.time())
         rate = "2048bps"
         phyMode = "DsssRate11Mbps"
         tr_name = self.m_CSVfileName + "-compare"
