@@ -21,17 +21,23 @@ __workdir__ = os.path.join(__location__, "work")
 
 class RoutingExperiment:
     def __init__(self):
-        self.port = 9
+        # Refresh on run time
         self.bytesTotal = 0
         self.packetsReceived = 0
+
+        # Default configs
+        self.port = 9
         self.m_CSVfileName = "manet-routing.output"
         self.m_nSinks = 10
         self.m_protocolName = ""
-        self.m_txp = 7.5
-        self.m_traceMobility = False
-        self.m_protocol = 2
-        self.m_total_time = 200
+        self.m_txp = 8.9048
+        self.m_total_time = 1000
+        self.m_node_speed = 20  # in m/s
+
+        # Used to simulations
+        self.m_protocol = 3
         self.m_nodes = 50
+        self.m_node_pause = 0  # in s
 
     # Ptr<Socket> socket, Ptr<Packet> packet, Address senderAddress
     # returns string
@@ -64,7 +70,7 @@ class RoutingExperiment:
             spamwriter = csv.writer(csvfile, delimiter=';',
                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
             spamwriter.writerow(
-                ['SimulationSecond', 'ReceiveRate', 'PacketsReceived', 'NumberOfSinks', 'RoutingProtocol',
+                ['SimulationSecond', 'ReceiveRate', 'PacketsReceived', 'PacketDeliveryRatio', 'NumberOfSinks', 'RoutingProtocol',
                  'TransmissionPower'])
 
     def CheckThroughput(self):
@@ -72,10 +78,14 @@ class RoutingExperiment:
         self.bytesTotal = 0
         now = int((ns.core.Simulator.Now()).GetSeconds())
 
+        # Packet delivery ratio
+        # 4 is number of packets send each second
+        pdr = self.packetsReceived / (4 * self.m_nSinks)
+
         with open(os.path.join(__workdir__, (self.m_CSVfileName + ".csv")), 'a') as csvfile:
             spamwriter = csv.writer(csvfile, delimiter=';',
                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            spamwriter.writerow([now, kbs, self.packetsReceived, self.m_nSinks, self.m_protocolName, self.m_txp])
+            spamwriter.writerow([now, kbs, self.packetsReceived, pdr, self.m_nSinks, self.m_protocolName, self.m_txp])
 
         self.packetsReceived = 0
         ns.core.Simulator.Schedule(ns.core.Seconds(1.0), RoutingExperiment.CheckThroughput, self)
@@ -91,16 +101,6 @@ class RoutingExperiment:
 
         return sink
 
-    # int argc, char **argv
-    # returns string
-    def CommandSetup(self, argc, argv):
-        cmd = ns.core.CommandLine()  # type: CommandLine
-        cmd.AddValue("CSVfileName", "The name of the CSV output file name", self.m_CSVfileName)
-        cmd.AddValue("traceMobility", "Enable mobility tracing", self.m_traceMobility)
-        cmd.AddValue("protocol", "1=OLSR;2=AODV;3=DSDV;4=DSR", self.m_protocol)
-        cmd.Parse(argc, argv)
-        return self.m_CSVfileName
-
     # int nSinks, double txp, std::string CSVfileName
     def Run(self, *positional_parameters, **keyword_parameters):
         ns.network.Packet.EnablePrinting()
@@ -113,6 +113,12 @@ class RoutingExperiment:
             self.m_total_time = int(os.environ["TOTAL_TIME"])
         if "NODES" in os.environ:
             self.m_nodes = int(os.environ["NODES"])
+        if "PROTOCOL" in os.environ:
+            self.m_protocol = int(os.environ["PROTOCOL"])
+        if "NODE_SPEED" in os.environ:
+            self.m_node_speed = int(os.environ["NODE_SPEED"])
+        if "NODE_PAUSE" in os.environ:
+            self.m_node_pause = int(os.environ["NODE_PAUSE"])
         if "FILE_NAME" in os.environ:
             self.m_CSVfileName = os.environ["FILE_NAME"]
 
@@ -124,15 +130,19 @@ class RoutingExperiment:
             self.m_total_time = keyword_parameters['TotalTime'];
         if 'Nodes' in keyword_parameters:
             self.m_nodes = keyword_parameters['Nodes'];
+        if 'Protocol' in keyword_parameters:
+            self.m_protocol = keyword_parameters['Protocol'];
+        if 'NodeSpeed' in keyword_parameters:
+            self.m_node_speed = keyword_parameters['NodeSpeed'];
+        if 'NodePause' in keyword_parameters:
+            self.m_node_pause = keyword_parameters['NodePause'];
         if 'CSVfileName' in keyword_parameters:
             self.m_CSVfileName = keyword_parameters['CSVfileName'];
 
         self.m_CSVfileName += "." + str(time.time())
-        rate = "2048bps"
+        rate = "2048bps"  # 4 packets/s => 64bytes * 8 = 512bits * 4 = 2048 bits por segundo
         phyMode = "DsssRate11Mbps"
         tr_name = self.m_CSVfileName + "-compare"
-        nodeSpeed = 20  # in m/s
-        nodePause = 0  # in s
         self.m_protocolName = "protocol"
 
         ns.core.Config.SetDefault("ns3::OnOffApplication::PacketSize", ns.core.StringValue("64"))
@@ -179,8 +189,8 @@ class RoutingExperiment:
             ns.mobility.PositionAllocator.GetTypeId())  # type: Ptr<PositionAllocator>
         streamIndex += taPositionAlloc.AssignStreams(streamIndex)
 
-        ssSpeed = "ns3::UniformRandomVariable[Min=0.0|Max=%s]" % (nodeSpeed)
-        ssPause = "ns3::ConstantRandomVariable[Constant=%s]" % (nodePause)
+        ssSpeed = "ns3::UniformRandomVariable[Min=0.0|Max=%s]" % self.m_node_speed
+        ssPause = "ns3::ConstantRandomVariable[Constant=%s]" % self.m_node_speed
 
         mobilityAdhoc.SetMobilityModel("ns3::RandomWaypointMobilityModel",
                                        "Speed", ns.core.StringValue(ssSpeed),
@@ -211,7 +221,7 @@ class RoutingExperiment:
         elif self.m_protocol == 4:
             self.m_protocolName = "DSR"
         else:
-            print("No such protocol:%s" % (self.m_protocol))  # NS_FATAL_ERROR ("No such protocol:" << m_protocol);
+            print("No such protocol:%s" % str(self.m_protocol))  # NS_FATAL_ERROR ("No such protocol:" << m_protocol);
 
         if self.m_protocol < 4:
             internet.SetRoutingHelper(list)
@@ -220,6 +230,9 @@ class RoutingExperiment:
             internet.Install(adhocNodes)
             dsrMain.Install(dsr, adhocNodes)
 
+        self.m_CSVfileName += "_" + self.m_protocolName
+        self.m_CSVfileName += "_nodes_" + str(self.m_nodes)
+        self.m_CSVfileName += "_nodepause_" + str(self.m_node_pause)
         print("assigning ip address")  # NS_LOG_INFO("assigning ip address");
 
         addressAdhoc = ns.internet.Ipv4AddressHelper()
@@ -250,10 +263,10 @@ class RoutingExperiment:
         ss = self.m_nodes
         nodes = str(ss)
 
-        ss2 = nodeSpeed
+        ss2 = self.m_node_speed
         sNodeSpeed = str(ss2)
 
-        ss3 = nodePause
+        ss3 = self.m_node_pause
         sNodePause = str(ss3)
 
         ss4 = rate
@@ -265,7 +278,7 @@ class RoutingExperiment:
                   nodes + "nodes_" + \
                   sNodeSpeed + "speed_" + \
                   sNodePause + "pause_" + \
-                  sRate + "rate";
+                  sRate + "rate"
 
         # AsciiTraceHelper ascii;
         # Ptr<OutputStreamWrapper> osw = ascii.CreateFileStream ( (tr_name + ".tr").c_str());
@@ -306,4 +319,28 @@ if __name__ == "__main__":
               txp=float(sys.argv[2]),
               TotalTime=int(sys.argv[3]),
               Nodes=int(sys.argv[4]),
-              CSVfileName=sys.argv[5])
+              Protocol=int(sys.argv[5]))
+    if len(sys.argv) == 6:
+        v.Run(nSinks=int(sys.argv[1]),
+              txp=float(sys.argv[2]),
+              TotalTime=int(sys.argv[3]),
+              Nodes=int(sys.argv[4]),
+              Protocol=int(sys.argv[5]),
+              NodeSpeed=int(sys.argv[6]))
+    if len(sys.argv) == 7:
+        v.Run(nSinks=int(sys.argv[1]),
+              txp=float(sys.argv[2]),
+              TotalTime=int(sys.argv[3]),
+              Nodes=int(sys.argv[4]),
+              Protocol=int(sys.argv[5]),
+              NodeSpeed=int(sys.argv[6]),
+              NodePause=int(sys.argv[7]))
+    if len(sys.argv) == 8:
+        v.Run(nSinks=int(sys.argv[1]),
+              txp=float(sys.argv[2]),
+              TotalTime=int(sys.argv[3]),
+              Nodes=int(sys.argv[4]),
+              Protocol=int(sys.argv[5]),
+              NodeSpeed=int(sys.argv[6]),
+              NodePause=int(sys.argv[7]),
+              CSVfileName=sys.argv[8])
