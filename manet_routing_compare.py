@@ -28,15 +28,15 @@ class RoutingExperiment:
         # Default configs
         self.port = 9
         self.m_CSVfileName = "manet-routing.output"
-        self.m_nSinks = 10
+        self.m_nodes = 50
         self.m_protocolName = ""
         self.m_txp = 8.9048
         self.m_total_time = 1000
         self.m_node_speed = 20  # in m/s
 
         # Used to simulations
+        self.m_nSinks = 10
         self.m_protocol = 3
-        self.m_nodes = 50
         self.m_node_pause = 0  # in s
 
     # Ptr<Socket> socket, Ptr<Packet> packet, Address senderAddress
@@ -190,7 +190,7 @@ class RoutingExperiment:
         streamIndex += taPositionAlloc.AssignStreams(streamIndex)
 
         ssSpeed = "ns3::UniformRandomVariable[Min=0.0|Max=%s]" % self.m_node_speed
-        ssPause = "ns3::ConstantRandomVariable[Constant=%s]" % self.m_node_speed
+        ssPause = "ns3::ConstantRandomVariable[Constant=%s]" % self.m_node_pause
 
         mobilityAdhoc.SetMobilityModel("ns3::RandomWaypointMobilityModel",
                                        "Speed", ns.core.StringValue(ssSpeed),
@@ -230,9 +230,6 @@ class RoutingExperiment:
             internet.Install(adhocNodes)
             dsrMain.Install(dsr, adhocNodes)
 
-        self.m_CSVfileName += "_" + self.m_protocolName
-        self.m_CSVfileName += "_nodes_" + str(self.m_nodes)
-        self.m_CSVfileName += "_nodepause_" + str(self.m_node_pause)
         print("assigning ip address")  # NS_LOG_INFO("assigning ip address");
 
         addressAdhoc = ns.internet.Ipv4AddressHelper()
@@ -260,7 +257,7 @@ class RoutingExperiment:
             temp.Start(ns.core.Seconds(var.GetValue(100.0, 101.0)))
             temp.Stop(ns.core.Seconds(self.m_total_time))
 
-        ss = self.m_nodes
+        ss = self.m_nSinks
         nodes = str(ss)
 
         ss2 = self.m_node_speed
@@ -275,10 +272,12 @@ class RoutingExperiment:
         # NS_LOG_INFO ("Configure Tracing.");
         tr_name = tr_name + "_" + \
                   self.m_protocolName + "_" + \
-                  nodes + "nodes_" + \
+                  nodes + "sinks_" + \
                   sNodeSpeed + "speed_" + \
                   sNodePause + "pause_" + \
                   sRate + "rate"
+
+        self.m_CSVfileName = tr_name
 
         # AsciiTraceHelper ascii;
         # Ptr<OutputStreamWrapper> osw = ascii.CreateFileStream ( (tr_name + ".tr").c_str());
@@ -289,6 +288,7 @@ class RoutingExperiment:
         # Ptr<FlowMonitor> flowmon;
         # FlowMonitorHelper flowmonHelper;
         # flowmon = flowmonHelper.InstallAll ();
+        flowmon = ns.flow_monitor.FlowMonitorHelper().InstallAll()
 
         # NS_LOG_INFO ("Run Simulation.");
         print("Run Simulation.")
@@ -300,6 +300,7 @@ class RoutingExperiment:
         ns.core.Simulator.Run()
 
         # flowmon->SerializeToXmlFile ((tr_name + ".flowmon").c_str(), false, false);
+        flowmon.SerializeToXmlFile(os.path.join(__workdir__, "%s.flowmon" % (tr_name)), False, False)
 
         ns.core.Simulator.Destroy()
 
