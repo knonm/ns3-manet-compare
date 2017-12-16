@@ -15,18 +15,22 @@ import ns.wifi
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
+__workdir__ = os.path.join(__location__, "work")
+
 
 class RoutingExperiment:
     def __init__(self):
         self.port = 9
         self.bytesTotal = 0
         self.packetsReceived = 0
-        self.m_CSVfileName = "manet-routing.output.csv"
+        self.m_CSVfileName = "manet-routing.output"
         self.m_nSinks = 10
         self.m_protocolName = ""
         self.m_txp = 7.5
         self.m_traceMobility = False
         self.m_protocol = 2
+        self.m_total_time = 200
+        self.m_nodes = 50
 
     # Ptr<Socket> socket, Ptr<Packet> packet, Address senderAddress
     # returns string
@@ -35,7 +39,7 @@ class RoutingExperiment:
 
         if ns.network.InetSocketAddress.IsMatchingType(senderAddress):
             addr = ns.network.InetSocketAddress.ConvertFrom(senderAddress)  # type: InetSocketAddress
-            ipv4 = addr.GetIpv4() # type: Ipv4Address
+            ipv4 = addr.GetIpv4()  # type: Ipv4Address
             oss += " received one packet from "
             sys.stdout.write(oss)
             print ipv4
@@ -55,17 +59,19 @@ class RoutingExperiment:
             packet = socket.RecvFrom(senderAddress)
 
     def WriteHeaderCsv(self):
-        with open(os.path.join(__location__, self.m_CSVfileName), 'w') as csvfile:
+        with open(os.path.join(__workdir__, (self.m_CSVfileName + ".csv")), 'w') as csvfile:
             spamwriter = csv.writer(csvfile, delimiter=';',
                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            spamwriter.writerow(['SimulationSecond', 'ReceiveRate', 'PacketsReceived', 'NumberOfSinks', 'RoutingProtocol', 'TransmissionPower'])
+            spamwriter.writerow(
+                ['SimulationSecond', 'ReceiveRate', 'PacketsReceived', 'NumberOfSinks', 'RoutingProtocol',
+                 'TransmissionPower'])
 
     def CheckThroughput(self):
         kbs = (self.bytesTotal * 8.0) / 1000
         self.bytesTotal = 0
         now = int((ns.core.Simulator.Now()).GetSeconds())
 
-        with open(os.path.join(__location__, self.m_CSVfileName), 'a') as csvfile:
+        with open(os.path.join(__workdir__, (self.m_CSVfileName + ".csv")), 'a') as csvfile:
             spamwriter = csv.writer(csvfile, delimiter=';',
                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
             spamwriter.writerow([now, kbs, self.packetsReceived, self.m_nSinks, self.m_protocolName, self.m_txp])
@@ -102,15 +108,16 @@ class RoutingExperiment:
             self.m_nSinks = keyword_parameters['nSinks'];
         if 'txp' in keyword_parameters:
             self.m_txp = keyword_parameters['txp'];
+        if 'TotalTime' in keyword_parameters:
+            self.m_total_time = keyword_parameters['TotalTime'];
+        if 'Nodes' in keyword_parameters:
+            self.m_nodes = keyword_parameters['Nodes'];
         if 'CSVfileName' in keyword_parameters:
             self.m_CSVfileName = keyword_parameters['CSVfileName'];
 
-        nWifis = 50
-
-        TotalTime = 200.0
         rate = "2048bps"
         phyMode = "DsssRate11Mbps"
-        tr_name = "manet-routing-compare"
+        tr_name = self.m_CSVfileName + "-compare"
         nodeSpeed = 20  # in m/s
         nodePause = 0  # in s
         self.m_protocolName = "protocol"
@@ -122,7 +129,7 @@ class RoutingExperiment:
         ns.core.Config.SetDefault("ns3::WifiRemoteStationManager::NonUnicastMode", ns.core.StringValue(phyMode));
 
         adhocNodes = ns.network.NodeContainer()
-        adhocNodes.Create(nWifis)
+        adhocNodes.Create(self.m_nodes)
 
         # setting up wifi phy and channel using helpers
         wifi = ns.wifi.WifiHelper()
@@ -204,7 +211,6 @@ class RoutingExperiment:
 
         addressAdhoc = ns.internet.Ipv4AddressHelper()
         addressAdhoc.SetBase(ns.network.Ipv4Address("10.1.1.0"), ns.network.Ipv4Mask("255.255.255.0"))
-        adhocInterfaces = ns.internet.Ipv4InterfaceContainer()
         adhocInterfaces = addressAdhoc.Assign(adhocDevices)
 
         onoff1 = ns.applications.OnOffHelper("ns3::UdpSocketFactory", ns.network.Address())
@@ -226,28 +232,33 @@ class RoutingExperiment:
 
             temp = onoff1.Install(adhocNodes.Get(i + self.m_nSinks))  # type: ApplicationContainer
             temp.Start(ns.core.Seconds(var.GetValue(100.0, 101.0)))
-            temp.Stop(ns.core.Seconds(TotalTime))
+            temp.Stop(ns.core.Seconds(self.m_total_time))
 
-        ss = nWifis
-        nodes = ss
+        ss = self.m_nodes
+        nodes = str(ss)
 
         ss2 = nodeSpeed
-        sNodeSpeed = ss2
+        sNodeSpeed = str(ss2)
 
         ss3 = nodePause
-        sNodePause = ss3
+        sNodePause = str(ss3)
 
         ss4 = rate
-        sRate = ss4
+        sRate = str(ss4)
 
         # NS_LOG_INFO ("Configure Tracing.");
-        # tr_name = tr_name + "_" + self.m_protocolName +"_" + nodes + "nodes_" + sNodeSpeed + "speed_" + sNodePause + "pause_" + sRate + "rate";
+        tr_name = tr_name + "_" + \
+                  self.m_protocolName + "_" + \
+                  nodes + "nodes_" + \
+                  sNodeSpeed + "speed_" + \
+                  sNodePause + "pause_" + \
+                  sRate + "rate";
 
         # AsciiTraceHelper ascii;
         # Ptr<OutputStreamWrapper> osw = ascii.CreateFileStream ( (tr_name + ".tr").c_str());
         # wifiPhy.EnableAsciiAll (osw);
         ascii = ns.network.AsciiTraceHelper()
-        ns.mobility.MobilityHelper.EnableAsciiAll(ascii.CreateFileStream(tr_name + ".mob"))
+        ns.mobility.MobilityHelper.EnableAsciiAll(ascii.CreateFileStream(os.path.join(__workdir__, (tr_name + ".mob"))))
 
         # Ptr<FlowMonitor> flowmon;
         # FlowMonitorHelper flowmonHelper;
@@ -259,7 +270,7 @@ class RoutingExperiment:
         self.WriteHeaderCsv()
         self.CheckThroughput()
 
-        ns.core.Simulator.Stop(ns.core.Seconds(TotalTime))
+        ns.core.Simulator.Stop(ns.core.Seconds(self.m_total_time))
         ns.core.Simulator.Run()
 
         # flowmon->SerializeToXmlFile ((tr_name + ".flowmon").c_str(), false, false);
@@ -276,4 +287,10 @@ if __name__ == "__main__":
     if len(sys.argv) == 3:
         v.Run(nSinks=int(sys.argv[1]), txp=float(sys.argv[2]))
     if len(sys.argv) == 4:
-        v.Run(nSinks=int(sys.argv[1]), txp=float(sys.argv[2]), CSVfileName=sys.argv[3])
+        v.Run(nSinks=int(sys.argv[1]), txp=float(sys.argv[2]), TotalTime=int(sys.argv[3]), Nodes=int(sys.argv[4]))
+    if len(sys.argv) == 5:
+        v.Run(nSinks=int(sys.argv[1]),
+              txp=float(sys.argv[2]),
+              TotalTime=int(sys.argv[3]),
+              Nodes=int(sys.argv[4]),
+              CSVfileName=sys.argv[5])

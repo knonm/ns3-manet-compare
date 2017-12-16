@@ -29,11 +29,13 @@ RUN apt-get update && \
 RUN apt-get -y install wget
 RUN cd /tmp && \
     wget https://bootstrap.pypa.io/get-pip.py && \
-    python get-pip.py
-RUN apt-get install -y gccxml python-pygccxml
+    python get-pip.py && \
+    apt-get install -y gccxml python-pygccxml python-gnome2 python-rsvg
 
-RUN apt-get install -y python-gnome2 python-rsvg
+ADD manet_routing_compare.py /usr/ns3/ns-3.26/
 
 WORKDIR /usr/ns3/ns-3.26
 
 VOLUME ["/usr/ns3/ns-3.26/work"]
+
+CMD ["./waf", "--pyrun", "manet_routing_compare.py"]
