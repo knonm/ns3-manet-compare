@@ -5,6 +5,7 @@ import time
 
 import ns.aodv
 import ns.applications
+import ns.flow_monitor
 import ns.core
 import ns.dsdv
 import ns.dsr
@@ -33,6 +34,7 @@ class RoutingExperiment:
         self.m_txp = 8.9048
         self.m_total_time = 1000
         self.m_node_speed = 20  # in m/s
+        self.m_debugger = True
 
         # Used to simulations
         self.m_nSinks = 10
@@ -70,7 +72,12 @@ class RoutingExperiment:
             spamwriter = csv.writer(csvfile, delimiter=';',
                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
             spamwriter.writerow(
-                ['SimulationSecond', 'ReceiveRate', 'PacketsReceived', 'PacketDeliveryRatio', 'NumberOfSinks', 'RoutingProtocol',
+                ['SimulationSecond',
+                 'ReceiveRate',
+                 'PacketsReceived',
+                 'PacketDeliveryRatio',
+                 'NumberOfSinks',
+                 'RoutingProtocol',
                  'TransmissionPower'])
 
     def CheckThroughput(self):
@@ -100,6 +107,37 @@ class RoutingExperiment:
         sink.SetRecvCallback(self.ReceivePacket)
 
         return sink
+
+    @staticmethod
+    def print_stats(output, st):
+        print >> output, "  Tx Bytes: ", st.txBytes
+        print >> output, "  Rx Bytes: ", st.rxBytes
+        print >> output, "  Tx Packets: ", st.txPackets
+        print >> output, "  Rx Packets: ", st.rxPackets
+        print >> output, "  Lost Packets: ", st.lostPackets
+        if st.rxPackets > 0:
+            print >> output, "  Mean{Delay}: ", (st.delaySum.GetSeconds() / st.rxPackets)
+            print >> output, "  Mean{Jitter}: ", (st.jitterSum.GetSeconds() / (st.rxPackets - 1))
+            print >> output, "  Mean{Hop Count}: ", float(st.timesForwarded) / st.rxPackets + 1
+
+        if 0:
+            print >> output, "Delay Histogram"
+            for i in range(st.delayHistogram.GetNBins()):
+                print >> output, " ", i, "(", st.delayHistogram.GetBinStart(i), "-", \
+                    st.delayHistogram.GetBinEnd(i), "): ", st.delayHistogram.GetBinCount(i)
+            print >> output, "Jitter Histogram"
+            for i in range(st.jitterHistogram.GetNBins()):
+                print >> output, " ", i, "(", st.jitterHistogram.GetBinStart(i), "-", \
+                    st.jitterHistogram.GetBinEnd(i), "): ", st.jitterHistogram.GetBinCount(i)
+            print >> output, "PacketSize Histogram"
+            for i in range(st.packetSizeHistogram.GetNBins()):
+                print >> output, " ", i, "(", st.packetSizeHistogram.GetBinStart(i), "-", \
+                    st.packetSizeHistogram.GetBinEnd(i), "): ", st.packetSizeHistogram.GetBinCount(i)
+
+        for reason, drops in enumerate(st.packetsDropped):
+            print "  Packets dropped by reason %i: %i" % (reason, drops)
+            # for reason, drops in enumerate(st.bytesDropped):
+            #    print "Bytes dropped by reason %i: %i" % (reason, drops)
 
     # int nSinks, double txp, std::string CSVfileName
     def Run(self, *positional_parameters, **keyword_parameters):
@@ -279,18 +317,19 @@ class RoutingExperiment:
 
         self.m_CSVfileName = tr_name
 
-        # AsciiTraceHelper ascii;
-        # Ptr<OutputStreamWrapper> osw = ascii.CreateFileStream ( (tr_name + ".tr").c_str());
-        # wifiPhy.EnableAsciiAll (osw);
         ascii = ns.network.AsciiTraceHelper()
-        ns.mobility.MobilityHelper.EnableAsciiAll(ascii.CreateFileStream(os.path.join(__workdir__, (tr_name + ".mob"))))
+        wifiPhy.EnableAsciiAll(ascii.CreateFileStream(os.path.join(__workdir__, "%s.tr" % tr_name)))
+        ns.mobility.MobilityHelper.EnableAsciiAll(ascii.CreateFileStream(os.path.join(__workdir__, "%s.mob" % tr_name)))
 
-        # Ptr<FlowMonitor> flowmon;
-        # FlowMonitorHelper flowmonHelper;
-        # flowmon = flowmonHelper.InstallAll ();
-        flowmon = ns.flow_monitor.FlowMonitorHelper().InstallAll()
+        # internet.EnablePcapAll("wifi-olsr")
+        flowmon_helper = ns.flow_monitor.FlowMonitorHelper()
+        # flowmon_helper.SetMonitorAttribute("StartTime", ns.core.TimeValue(ns.core.Seconds(31)))
+        monitor = flowmon_helper.InstallAll()
+        monitor = flowmon_helper.GetMonitor()
+        monitor.SetAttribute("DelayBinWidth", ns.core.DoubleValue(0.001))
+        monitor.SetAttribute("JitterBinWidth", ns.core.DoubleValue(0.001))
+        monitor.SetAttribute("PacketSizeBinWidth", ns.core.DoubleValue(20))
 
-        # NS_LOG_INFO ("Run Simulation.");
         print("Run Simulation.")
 
         self.WriteHeaderCsv()
@@ -299,8 +338,18 @@ class RoutingExperiment:
         ns.core.Simulator.Stop(ns.core.Seconds(self.m_total_time))
         ns.core.Simulator.Run()
 
-        # flowmon->SerializeToXmlFile ((tr_name + ".flowmon").c_str(), false, false);
-        flowmon.SerializeToXmlFile(os.path.join(__workdir__, "%s.flowmon" % (tr_name)), False, False)
+        monitor.CheckForLostPackets()
+        classifier = flowmon_helper.GetClassifier()
+
+        if self.m_debugger:
+            for flow_id, flow_stats in monitor.GetFlowStats():
+                t = classifier.FindFlow(flow_id)
+                proto = {6: 'TCP', 17: 'UDP'}[t.protocol]
+                print "FlowID: %i (%s %s/%s --> %s/%i)" % \
+                      (flow_id, proto, t.sourceAddress, t.sourcePort, t.destinationAddress, t.destinationPort)
+                self.print_stats(sys.stdout, flow_stats)
+
+        monitor.SerializeToXmlFile(os.path.join(__workdir__, "%s.flowmon" % tr_name), True, True)
 
         ns.core.Simulator.Destroy()
 
