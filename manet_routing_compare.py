@@ -349,11 +349,18 @@ class RoutingExperiment:
 
         if self.m_debugger:
             for flow_id, flow_stats in monitor.GetFlowStats():
-                t = classifier.FindFlow(flow_id)
-                proto = {6: 'TCP', 17: 'UDP'}[t.protocol]
-                print "FlowID: %i (%s %s/%s --> %s/%i)" % \
-                      (flow_id, proto, t.sourceAddress, t.sourcePort, t.destinationAddress, t.destinationPort)
-                self.print_stats(sys.stdout, flow_stats)
+
+                with open(os.path.join(__workdir__, (self.m_CSVfileName + ".txt")), 'a') as file:
+                    # spamwriter = csv.writer(csvfile, delimiter=';',
+                    #                         quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                    # spamwriter.writerow(
+                    #     [now, kbs, self.packetsReceived, pdr, self.m_nSinks, self.m_protocolName, self.m_txp])
+                    t = classifier.FindFlow(flow_id)
+                    proto = {6: 'TCP', 17: 'UDP'}[t.protocol]
+                    file.write("FlowID: %i (%s %s/%s --> %s/%i)\n" % \
+                      (flow_id, proto, t.sourceAddress, t.sourcePort, t.destinationAddress, t.destinationPort))
+                    self.print_stats(file, flow_stats)
+                    file.close()
 
         monitor.SerializeToXmlFile(os.path.join(__workdir__, "%s.flowmon" % tr_name), True, True)
 
