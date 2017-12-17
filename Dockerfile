@@ -32,6 +32,8 @@ RUN cd /tmp && \
     python get-pip.py && \
     apt-get install -y gccxml python-pygccxml python-gnome2 python-rsvg
 
+RUN pip install matplotlib
+
 ADD manet_routing_compare.py /usr/ns3/ns-3.26/
 
 WORKDIR /usr/ns3/ns-3.26

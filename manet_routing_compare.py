@@ -2,6 +2,12 @@ import csv
 import sys
 import os
 import time
+import matplotlib
+
+# Force matplotlib to not use any Xwindows backend.
+matplotlib.use('Agg')
+
+import matplotlib.pyplot as plt
 
 import ns.aodv
 import ns.applications
@@ -318,7 +324,7 @@ class RoutingExperiment:
         self.m_CSVfileName = tr_name
 
         ascii = ns.network.AsciiTraceHelper()
-        wifiPhy.EnableAsciiAll(ascii.CreateFileStream(os.path.join(__workdir__, "%s.tr" % tr_name)))
+        # wifiPhy.EnableAsciiAll(ascii.CreateFileStream(os.path.join(__workdir__, "%s.tr" % tr_name)))
         ns.mobility.MobilityHelper.EnableAsciiAll(ascii.CreateFileStream(os.path.join(__workdir__, "%s.mob" % tr_name)))
 
         # internet.EnablePcapAll("wifi-olsr")
@@ -350,6 +356,23 @@ class RoutingExperiment:
                 self.print_stats(sys.stdout, flow_stats)
 
         monitor.SerializeToXmlFile(os.path.join(__workdir__, "%s.flowmon" % tr_name), True, True)
+
+        delays = []
+        for flow_id, flow_stats in monitor.GetFlowStats():
+            tupl = classifier.FindFlow(flow_id)
+            if tupl.protocol == 17 and tupl.sourcePort == 698:
+                continue
+
+            if flow_stats.rxPackets == 0:
+                delays.append(0)
+            else:
+                delays.append(flow_stats.delaySum.GetSeconds() / flow_stats.rxPackets)
+
+        plt.hist(delays, 20)
+        plt.xlabel("Delay (s)")
+        plt.ylabel("Number of Flows")
+        plt.savefig(os.path.join(__workdir__, '%s.png' % tr_name), dpi=75)
+        plt.show()
 
         ns.core.Simulator.Destroy()
 
