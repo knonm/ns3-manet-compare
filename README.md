@@ -26,8 +26,13 @@ $# gdb --args python work/manet_routing_compare.py [args]
 
 The args are optional and have an order, as follows:
  * nSinks - int. Default: 10
- * txp - float. Default: 0.0
- * CSVfileName - string. Default: "manet-routing.output.csv"
+ * txp - float. Default: 8.9048
+ * TotalTime - int. Default: 1000
+ * Nodes - int. Default: 50
+ * Protocol - int. Default: 3 (means OSDV Protocol)
+ * NodeSpeed - int. Default: 20 (in m/s)
+ * NodePause - int. Default: 0 (in s)
+ * CSVfileName - string. Default: "manet-routing.output"
 
 ## Docker support
 
@@ -37,10 +42,12 @@ All dependencies installed for this container are listed on:  https://www.nsnam.
 
 ```sh
 $ docker build -t knonm/ns3-manet-compare .
-$ docker run --rm \
-    -v `pwd`:/usr/ns3/ns-3.26/work \
-    knonm/ns3-manet-compare \
-    ./waf --pyrun work/manet_routing_compare.py
+$ docker run --rm -it \
+    -e PROTOCOL=3 \
+    -e SINKS=10 \
+    -e NODE_PAUSE=100 \
+    -v `pwd`/build:/usr/ns3/ns-3.26/work \
+    knonm/ns3-manet-compare
 ```
 
 ### GUI support on OSX:
@@ -48,7 +55,7 @@ $ docker run --rm \
 1. Install XQuartz
 2. Find IP with `ifconfig en0 | grep inet | awk '$1=="inet" {print $2}'`
 3. Enable IP based access with `xhost + $IP`
-4. Run with  ```docker run --rm -it -v `pwd`:/usr/ns3/ns-3.26/work -e DISPLAY=$IP:0 -v /tmp/.X11-unix:/tmp/.X11-unix knonm/ns3-manet-compare```
+4. Run with  ```docker run --rm -it -v `pwd`/build:/usr/ns3/ns-3.26/work -e DISPLAY=$IP:0 -v /tmp/.X11-unix:/tmp/.X11-unix knonm/ns3-manet-compare```
 
 For more information check out [fredrikaverpil.github.io](https://fredrikaverpil.github.io/2016/07/31/docker-for-mac-and-gui-applications/).
 
